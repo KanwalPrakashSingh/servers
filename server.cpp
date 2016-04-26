@@ -9,6 +9,7 @@
 #include <string>
 #include <iostream>
 #include <thread>
+#include <vector>
 using namespace std;
 
 
@@ -50,21 +51,28 @@ void handle_server(int thread_id,int &socket_fd){
           error("ERROR on accept");
         }
         bzero(buffer,256);
+        g_lock.lock();
         n = read(socket_fd,buffer,255);
+        g_lock.unlock();
         if (n < 0) {
             cout<<"thread_id "<<thread_id<<endl;
             error("ERROR reading from socket");
         }
+        printf("  scoket_fd %d\n",socket_fd);
         printf("thread id : %d , Here is the message: %s\n",thread_id,buffer);
         string server_to_client = "I got your message";
-        n = write(socket_fd,"I got your message",18);
-        if (n < 0){
-            error("ERROR writing to socket");
-        }
+        //writing the message that we received a message from client
+        // n = write(socket_fd,server_to_client.c_str(), server_to_client.length());
+        // cout<<"scoket fd afer server write "<<socket_fd<<endl;
+        // if (n < 0){
+        //     error("ERROR writing to socket");
+        // }
     }
-    close(socket_fd);
+    
     g_lock.lock();
     CLIENTS--;
+    close(socket_fd);
+    printf("closed socket file\n");
     g_lock.unlock();
 }
 
@@ -74,7 +82,7 @@ int main(int argc, char *argv[]){
     char buffer[256];
     int socket_fd, new_socket_fd, portno;
     socklen_t cli_len;
-    struct sockaddr_in serv_addr, cli_addr; //server address and client address structs , see comments in the top for structure
+    struct sockaddr_in serv_addr; //server address and client address structs , see comments in the top for structure
     int n; 
     if (argc < 2) {
         fprintf(stderr,"ERROR, no port provided\n");
@@ -99,15 +107,17 @@ int main(int argc, char *argv[]){
     listen(socket_fd,5);
     cout<<"enter the number of clients/exchanges "<<endl;
     cin>>CLIENTS;
-
+    //thread threads_container[CLIENTS];
     // keep running till a 0 is read from file 
     int thread_id=0;
     while(CLIENTS > 0){
+        struct sockaddr_in cli_addr;
         cli_len = sizeof(cli_addr);
         new_socket_fd = accept(socket_fd, (struct sockaddr *) &cli_addr,&cli_len); //accepting the connection
         //handle_server(thread_id,new_socket_fd);
         thread t(handle_server,thread_id ,ref(new_socket_fd));
-        t.detach();
+        t.join();
+        
         thread_id++;
         cout<<"clients active : "<< CLIENTS<<endl;
     }
